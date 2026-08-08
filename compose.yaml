@@ -1,0 +1,51 @@
+name: support-ticket-platform
+
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: support
+      POSTGRES_USER: support
+      POSTGRES_PASSWORD: local-development-only
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U support -d support"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql://support:local-development-only@database:5432/support
+      LOG_LEVEL: INFO
+      APP_ENV: local
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    networks: [backend, edge]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    networks: [edge]
+    restart: unless-stopped
+
+networks:
+  edge:
+  backend:
+    internal: true
+
+volumes:
+  postgres-data:
