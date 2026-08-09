@@ -50,7 +50,7 @@
     }
   ],
   "schemaVersion": 41,
-  "tags": ["orderflow", "portfolio"],
+  "tags": ["orderflow"],
   "templating": {"list": []},
   "time": {"from": "now-6h", "to": "now"},
   "title": "OrderFlow service overview",

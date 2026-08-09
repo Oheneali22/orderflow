@@ -2,7 +2,7 @@
 
 ## Proposed SLOs
 
-These are engineering targets for a portfolio workload, not claims based on production history.
+These are proposed engineering targets, not claims based on production traffic or a completed measurement window.
 
 | Signal | Objective | Measurement |
 |---|---|---|

@@ -33,5 +33,5 @@ The production migration path is a transactional outbox: retain the database tra
 - Web/API/worker Deployments have two replicas, rolling updates, PDBs, probes, and resource bounds.
 - API and worker scale independently because request traffic and background throughput differ.
 - Readiness removes dependency-broken pods from Services; liveness does not restart a healthy process merely because PostgreSQL is briefly unavailable.
-- Multi-AZ RDS is configurable but off by default in the portfolio environment to control cost; a sustained production environment should enable it.
+- Multi-AZ RDS is configurable but disabled by default to control costs; a sustained production environment should enable it.
 - NetworkPolicies deny by default and admit only ingress, web-to-API, monitoring scrapes, DNS, and database flows.

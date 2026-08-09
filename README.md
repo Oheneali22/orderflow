@@ -1,6 +1,6 @@
 # OrderFlow
 
-OrderFlow is an asynchronous order-processing platform and a production-shaped DevOps portfolio project. A browser submits an order, a Node.js API commits the order and processing job atomically to PostgreSQL, and independently scalable workers claim jobs without double-processing them.
+OrderFlow is an asynchronous order-processing platform designed around production-grade delivery and operations practices. A browser submits an order, a Node.js API commits the order and processing job atomically to PostgreSQL, and independently scalable workers claim jobs without double-processing them.
 
 [![CI](https://github.com/Oheneali22/orderflow/actions/workflows/ci.yml/badge.svg)](https://github.com/Oheneali22/orderflow/actions/workflows/ci.yml)
 
@@ -22,7 +22,7 @@ Secrets Manager --EKS Pod Identity--> External Secrets -> Kubernetes Secret
 
 The current queue adapter is PostgreSQL. `FOR UPDATE SKIP LOCKED` makes concurrent claims safe, and creating the order plus job in one transaction prevents stranded orders. The trade-off and SQS migration path are documented in [architecture.md](docs/architecture.md).
 
-## What this demonstrates
+## Key capabilities
 
 - Three hardened, non-root images with read-only Kubernetes root filesystems and blocking Trivy scans.
 - Pull-request CI for linting, tests against real PostgreSQL, Terraform validation, Helm rendering, secret/IaC scanning, image builds, and vulnerability scanning.
@@ -90,4 +90,3 @@ Production values reference image digests, not mutable tags. `developmentPostgre
 - [Reliability, SLOs, and testing](docs/reliability.md)
 - [Runbooks](docs/runbooks/)
 - [Troubleshooting journal](docs/troubleshooting.md)
-- [Resume and interview guide](docs/resume-guide.md)
