@@ -4,7 +4,7 @@
 
 `terraform/platform` defines paid, continuously billed resources: EKS control plane, EC2 nodes, RDS, interface endpoints, load balancers, persistent volumes, and optional NAT. Validation does not create them. Before applying, use the AWS Pricing Calculator, set a budget/alarm, choose a teardown time, and review a saved plan.
 
-For a short demonstration, use `database_deletion_protection=false`, `database_skip_final_snapshot=true`, leave NAT disabled, and temporarily enable `cluster_endpoint_public_access` with one explicit `/32` administrative CIDR. Those settings are not production durability defaults.
+For a short demonstration, use `database_deletion_protection=false`, `database_skip_final_snapshot=true`, enable NAT while Argo CD and public chart registries require outbound access, and temporarily enable `cluster_endpoint_public_access` with one explicit `/32` administrative CIDR. Those settings are not production durability defaults.
 
 ## Provision AWS
 

@@ -44,7 +44,7 @@ POST /api/orders -> PENDING -> PROCESSING -> COMPLETED
 
 It ran two web, two API, and two worker replicas under non-root/read-only security settings. During a 30-request in-cluster probe, one web pod was deleted; the Service returned all 30 responses successfully while the Deployment replaced the pod.
 
-The paid AWS application stack is deliberately not left running continuously. Terraform is initialized and validated in CI; [deployment.md](docs/deployment.md) defines the apply, verification, and teardown gates.
+The paid AWS application stack is deliberately not left running continuously. It was provisioned for a time-bounded verification on 2026-08-09: all Argo CD applications reconciled, six OrderFlow replicas and Prometheus/Grafana became healthy, encrypted `gp3` claims bound through EBS CSI, and a live order moved `PENDING` to `COMPLETED` through web, API, private RDS, and worker. The stack was then destroyed; [deployment.md](docs/deployment.md) defines the repeatable gates.
 
 ## Run locally
 
