@@ -1,16 +1,16 @@
 global:
   imageRegistry: 942909611186.dkr.ecr.us-east-1.amazonaws.com
-  imageTag: sha-f742ad20278619082608e00c22870bd32e61ed43
+  imageTag: sha-ced1b5013246c2eb879f51d642cc463fff465eaf
 
 web:
   image:
-    digest: sha256:790b9c147a099b650982c6394a604d7c5d9c1a4c52ede19af24a16df2ca23fab
+    digest: sha256:9ed0c90a6dbfa9d03877e2e1ed62ce0fa2cac203edc62c4080e38c3ab618b8d5
 api:
   image:
-    digest: sha256:d1f30b9c8c64ce001a3cd1401ecc5ab6d4536841f2c93965c95ad20a2bc6c78b
+    digest: sha256:33b24aa5137505e3602796cfeadd891451c0987cf621ceff0f1a296f7c7d4d03
 worker:
   image:
-    digest: sha256:b9a6d4ca276af695272aea188addf06decc0eb2700c03581158752f1461ab8fe
+    digest: sha256:921e1e83f7f94140af303e26165933dca601725d8dbfcf343c98a1bed6d2ec54
 
 externalSecret:
   enabled: true
