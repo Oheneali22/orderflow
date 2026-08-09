@@ -78,6 +78,16 @@ resource "aws_eks_addon" "core" {
   addon_name   = each.value
 }
 
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name = aws_eks_cluster.this.name
+  addon_name   = "aws-ebs-csi-driver"
+
+  depends_on = [
+    aws_eks_node_group.application,
+    aws_eks_pod_identity_association.ebs_csi
+  ]
+}
+
 resource "aws_eks_access_entry" "administrator" {
   cluster_name  = aws_eks_cluster.this.name
   principal_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:user/devops-admin"
