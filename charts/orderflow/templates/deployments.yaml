@@ -1,0 +1,80 @@
+{{- $root := . -}}
+{{- range $name := list "web" "api" "worker" }}
+{{- $values := index $root.Values $name }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "orderflow.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: {{ $values.replicaCount }}
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels:
+      {{- include "orderflow.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "orderflow.selectorLabels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+      annotations:
+        checksum/config: {{ include (print $root.Template.BasePath "/configmap.yaml") $root | sha256sum }}
+    spec:
+      serviceAccountName: {{ $root.Release.Name }}-{{ $name }}
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      terminationGracePeriodSeconds: 30
+      {{- with $root.Values.global.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $name }}
+          image: {{ include "orderflow.image" (list $root $values.image) }}
+          imagePullPolicy: {{ $values.image.pullPolicy }}
+          securityContext:
+            runAsUser: {{ $values.runAsUser }}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          {{- if eq $name "web" }}
+          volumeMounts:
+            - { name: nginx-cache, mountPath: /var/cache/nginx }
+            - { name: nginx-run, mountPath: /run }
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $values.service.port }}
+          {{- if ne $name "web" }}
+          envFrom:
+            - configMapRef: { name: {{ $root.Release.Name }}-config }
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ternary (printf "%s-development-postgresql" $root.Release.Name) $root.Values.database.existingSecret $root.Values.developmentPostgresql.enabled }}
+                  key: {{ $root.Values.database.secretKey }}
+          {{- end }}
+          readinessProbe:
+            httpGet: { path: {{ ternary "/health" "/health/ready" (eq $name "web") }}, port: http }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: {{ ternary "/health" "/health/live" (eq $name "web") }}, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources: {{ toYaml $values.resources | nindent 12 }}
+      {{- if eq $name "web" }}
+      volumes:
+        - { name: nginx-cache, emptyDir: {} }
+        - { name: nginx-run, emptyDir: {} }
+      {{- end }}
+---
+{{- end }}

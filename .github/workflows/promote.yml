@@ -1,0 +1,91 @@
+name: Promote images
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full commit SHA whose immutable images should be promoted
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  promote:
+    name: Open production promotion PR
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate source SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: '[[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]'
+
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Resolve immutable ECR digests
+        id: images
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          for component in web api worker; do
+            digest=$(aws ecr describe-images \
+              --repository-name "orderflow-$component" \
+              --image-ids "imageTag=sha-$SOURCE_SHA" \
+              --query 'imageDetails[0].imageDigest' \
+              --output text)
+            test "$digest" != "None"
+            echo "$component=$digest" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Update production values
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          WEB_DIGEST: ${{ steps.images.outputs.web }}
+          API_DIGEST: ${{ steps.images.outputs.api }}
+          WORKER_DIGEST: ${{ steps.images.outputs.worker }}
+        run: >-
+          node scripts/set-production-images.mjs
+          environments/production/values.yaml
+          "$SOURCE_SHA"
+          "$WEB_DIGEST"
+          "$API_DIGEST"
+          "$WORKER_DIGEST"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.21.2
+
+      - name: Validate promoted release
+        run: helm lint charts/orderflow --values environments/production/values.yaml
+
+      - name: Open promotion pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          short_sha=${SOURCE_SHA:0:12}
+          branch="promote/$short_sha-${GITHUB_RUN_ID}"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git switch --create "$branch"
+          git add environments/production/values.yaml
+          git commit -m "Promote OrderFlow images from $short_sha"
+          git push --set-upstream origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Promote OrderFlow $short_sha to production" \
+            --body "Promotes the three CI-built immutable ECR images from commit \`$SOURCE_SHA\`. Merge approval is the production deployment boundary; Argo CD reconciles the reviewed digests."

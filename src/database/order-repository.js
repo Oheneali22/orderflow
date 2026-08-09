@@ -18,7 +18,7 @@ function serializeOrder(row, items) {
   };
 }
 
-export function createOrderRepository(pool) {
+export function createOrderRepository(pool, { claimTimeoutMs = 60000 } = {}) {
   return {
     async listProducts() {
       const result = await pool.query(
@@ -119,11 +119,14 @@ export function createOrderRepository(pool) {
         const result = await client.query(`
           SELECT id, order_id
           FROM order_jobs
-          WHERE status = 'PENDING' AND available_at <= NOW()
+          WHERE
+            (status = 'PENDING' AND available_at <= NOW())
+            OR
+            (status = 'CLAIMED' AND claimed_at <= NOW() - ($1 * INTERVAL '1 millisecond'))
           ORDER BY created_at
           FOR UPDATE SKIP LOCKED
           LIMIT 1
-        `);
+        `, [claimTimeoutMs]);
         if (result.rowCount === 0) {
           await client.query("COMMIT");
           return null;

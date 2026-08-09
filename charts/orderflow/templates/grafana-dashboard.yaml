@@ -1,0 +1,12 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-dashboard
+  labels:
+    {{- include "orderflow.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  orderflow.json: |-
+{{ .Files.Get "dashboards/orderflow.json" | indent 4 }}
+{{- end }}

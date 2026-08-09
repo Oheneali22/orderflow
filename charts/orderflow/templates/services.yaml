@@ -1,0 +1,29 @@
+{{- $root := . -}}
+{{- range $name := list "web" "api" "worker" }}
+{{- $values := index $root.Values $name }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ ternary "api" (printf "%s-%s" $root.Release.Name $name) (eq $name "api") }}
+  labels:
+    {{- include "orderflow.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  selector:
+    {{- include "orderflow.selectorLabels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: http
+      port: {{ $values.service.port }}
+      targetPort: http
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "orderflow.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+automountServiceAccountToken: false
+---
+{{- end }}

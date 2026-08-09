@@ -1,28 +1,54 @@
 # OrderFlow
 
-OrderFlow is a small asynchronous e-commerce order-processing system built as a practical DevOps learning environment. The application is intentionally understandable: a browser creates an order, an API stores it, and an independent worker processes it.
+OrderFlow is an asynchronous order-processing platform and a production-shaped DevOps portfolio project. A browser submits an order, a Node.js API commits the order and processing job atomically to PostgreSQL, and independently scalable workers claim jobs without double-processing them.
 
-## Current architecture
+[![CI](https://github.com/Oheneali22/orderflow/actions/workflows/ci.yml/badge.svg)](https://github.com/Oheneali22/orderflow/actions/workflows/ci.yml)
+
+## Architecture
 
 ```text
-Browser -> Nginx web :8080 -> Node.js API :3000 -> PostgreSQL
-                                      |               ^
-                                      v               |
-                              database job queue -> Node.js worker
+Internet
+   |
+Nginx ingress -> web replicas -> API replicas -> encrypted PostgreSQL/RDS
+                                      |                    ^
+                                      v                    |
+                              transactional job table -> worker replicas
+
+GitHub Actions --OIDC--> AWS IAM -> immutable ECR images
+                         Git PR -> Argo CD -> Helm -> EKS
+Prometheus <- ServiceMonitors <- API/worker metrics -> Grafana + alerts
+Secrets Manager --EKS Pod Identity--> External Secrets -> Kubernetes Secret
 ```
 
-The database-backed queue is a Phase 1 adapter, not a claim that PostgreSQL is Amazon SQS. It makes asynchronous processing observable locally. A later milestone will replace this adapter with SQS, retries, and a dead-letter queue.
+The current queue adapter is PostgreSQL. `FOR UPDATE SKIP LOCKED` makes concurrent claims safe, and creating the order plus job in one transaction prevents stranded orders. The trade-off and SQS migration path are documented in [architecture.md](docs/architecture.md).
 
-## Services
+## What this demonstrates
 
-| Service | Responsibility |
-|---|---|
-| `orderflow-web` | Static browser UI and `/api` reverse proxy |
-| `orderflow-api` | Validates requests, calculates server-side prices, writes orders and jobs atomically, exposes health and metrics |
-| `orderflow-worker` | Claims queued work, updates order state, exposes health and metrics |
-| PostgreSQL | Stores products, orders, item price snapshots, and temporary local jobs |
+- Three hardened, non-root images with read-only Kubernetes root filesystems and blocking Trivy scans.
+- Pull-request CI for linting, tests against real PostgreSQL, Terraform validation, Helm rendering, secret/IaC scanning, image builds, and vulnerability scanning.
+- GitHub-to-AWS OIDC with no stored AWS access keys; the trust policy uses GitHub's immutable repository identity and only permits `main`.
+- Private immutable ECR repositories and commit-addressed image tags.
+- Cost-gated Terraform for a two-AZ VPC, private EKS nodes, VPC endpoints, encrypted RDS, Secrets Manager, control-plane audit logs, and least-privilege EKS Pod Identity.
+- A reusable Helm chart with probes, requests/limits, HPAs, PDBs, NetworkPolicies, Pod Security compatibility, digest pinning, and optional local PostgreSQL.
+- Argo CD application-of-applications for ingress, external secrets, monitoring, and OrderFlow.
+- A reviewable promotion workflow that resolves ECR digests and opens a GitOps pull request; Argo CD never deploys an unreviewed tag.
+- Prometheus alerts, a Grafana service dashboard, SLOs, incident runbooks, and tested pod-replacement behavior.
+
+## Verified behavior
+
+The application has been tested locally with Compose and in a disposable Kubernetes 1.36 cluster. The Kubernetes verification used the same Helm chart in development mode and proved:
+
+```text
+POST /api/orders -> PENDING -> PROCESSING -> COMPLETED
+```
+
+It ran two web, two API, and two worker replicas under non-root/read-only security settings. During a 30-request in-cluster probe, one web pod was deleted; the Service returned all 30 responses successfully while the Deployment replaced the pod.
+
+The paid AWS application stack is deliberately not left running continuously. Terraform is initialized and validated in CI; [deployment.md](docs/deployment.md) defines the apply, verification, and teardown gates.
 
 ## Run locally
+
+Requirements: Node.js 20–22 and Docker with Compose.
 
 ```bash
 npm ci
@@ -31,28 +57,37 @@ npm test
 docker compose up --build --detach --wait
 ```
 
-Open `http://localhost:8080`. Only the web service is published to the host. The API, worker, and database communicate over private Compose networks.
+Open `http://localhost:8080`. Only Nginx is host-published; the worker and PostgreSQL remain on the internal data network.
+
+## Validate infrastructure and packaging
+
+```bash
+terraform fmt -check -recursive
+terraform -chdir=terraform/platform init -backend=false
+terraform -chdir=terraform/platform validate
+helm lint charts/orderflow --values environments/production/values.yaml
+helm template orderflow charts/orderflow --values environments/production/values.yaml
+```
+
+Production values reference image digests, not mutable tags. `developmentPostgresql.enabled` exists only for disposable cluster testing and is disabled by default.
 
 ## API
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/health` | Basic API health |
-| `GET` | `/health/live` | Process liveness |
-| `GET` | `/health/ready` | Database-backed readiness |
+| `GET` | `/health/live` | Dependency-free liveness |
+| `GET` | `/health/ready` | PostgreSQL-backed readiness |
 | `GET` | `/metrics` | Prometheus metrics |
 | `GET` | `/products` | Product catalog |
-| `POST` | `/orders` | Create a `PENDING` order and enqueue it |
-| `GET` | `/orders/:id` | Observe order state |
+| `POST` | `/orders` | Atomically create a `PENDING` order and job; returns `202` |
+| `GET` | `/orders/:id` | Observe the order transition |
 
-## Deliberate boundaries
+## Documentation
 
-This milestone does not include EKS, Kubernetes, SQS, SNS, RDS, Helm, Argo CD, or production secrets. Those components will be added only when the current deployment and failure modes are understood. Local credentials in Compose are disposable and are not a production secret-management pattern.
-
-See [architecture.md](docs/architecture.md) and [troubleshooting.md](docs/troubleshooting.md).
-
-## Delivery pipeline
-
-Pull requests run linting, unit tests, a real PostgreSQL integration test, Terraform validation, three image builds, and blocking Trivy scans. A push to `main` performs the same checks, assumes a least-privilege AWS role through GitHub OIDC, and publishes the exact scanned images to private ECR repositories with immutable `sha-<commit>` tags.
-
-No long-lived AWS access keys are stored in GitHub. Terraform manages the ECR repositories and publisher role in [`terraform/delivery`](terraform/delivery); its state is stored in the protected OrderFlow S3 backend created by [`terraform/state-bootstrap`](terraform/state-bootstrap).
+- [Architecture and decisions](docs/architecture.md)
+- [Deployment and promotion](docs/deployment.md)
+- [Security model](docs/security.md)
+- [Reliability, SLOs, and testing](docs/reliability.md)
+- [Runbooks](docs/runbooks/)
+- [Troubleshooting journal](docs/troubleshooting.md)
+- [Resume and interview guide](docs/resume-guide.md)

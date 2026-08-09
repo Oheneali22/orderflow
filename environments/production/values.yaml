@@ -1,0 +1,32 @@
+global:
+  imageRegistry: 942909611186.dkr.ecr.us-east-1.amazonaws.com
+  imageTag: sha-f742ad20278619082608e00c22870bd32e61ed43
+
+web:
+  image:
+    digest: sha256:790b9c147a099b650982c6394a604d7c5d9c1a4c52ede19af24a16df2ca23fab
+api:
+  image:
+    digest: sha256:d1f30b9c8c64ce001a3cd1401ecc5ab6d4536841f2c93965c95ad20a2bc6c78b
+worker:
+  image:
+    digest: sha256:b9a6d4ca276af695272aea188addf06decc0eb2700c03581158752f1461ab8fe
+
+externalSecret:
+  enabled: true
+  region: us-east-1
+  remoteKey: orderflow-production/database-url
+
+ingress:
+  enabled: true
+  className: nginx
+  host: orderflow.example.com
+
+serviceMonitor:
+  enabled: true
+
+prometheusRule:
+  enabled: true
+
+grafanaDashboard:
+  enabled: true

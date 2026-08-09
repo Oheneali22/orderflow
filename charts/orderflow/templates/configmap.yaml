@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    {{- include "orderflow.labels" . | nindent 4 }}
+data:
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  API_PORT: {{ .Values.api.service.port | quote }}
+  WORKER_HEALTH_PORT: {{ .Values.worker.service.port | quote }}
+  WORKER_POLL_INTERVAL_MS: {{ .Values.config.workerPollIntervalMs | quote }}
+  WORKER_PROCESSING_DELAY_MS: {{ .Values.config.workerProcessingDelayMs | quote }}
+  WORKER_CLAIM_TIMEOUT_MS: {{ .Values.config.workerClaimTimeoutMs | quote }}

@@ -1,0 +1,48 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "orderflow.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: orderflow.availability
+      rules:
+        - alert: OrderFlowApiUnavailable
+          expr: sum(up{namespace={{ .Release.Namespace | quote }},service="api"}) < 1
+          for: 2m
+          labels: { severity: critical, service: orderflow-api }
+          annotations:
+            summary: OrderFlow API has no healthy Prometheus targets
+            runbook_url: https://github.com/Oheneali22/orderflow/blob/main/docs/runbooks/api-unavailable.md
+        - alert: OrderFlowWorkerUnavailable
+          expr: sum(up{namespace={{ .Release.Namespace | quote }},service={{ printf "%s-worker" .Release.Name | quote }}}) < 1
+          for: 5m
+          labels: { severity: critical, service: orderflow-worker }
+          annotations:
+            summary: OrderFlow has no healthy worker targets
+            runbook_url: https://github.com/Oheneali22/orderflow/blob/main/docs/runbooks/worker-unavailable.md
+        - alert: OrderFlowApiHighErrorRate
+          expr: |
+            sum(rate(orderflow_api_http_request_duration_seconds_count{namespace={{ .Release.Namespace | quote }},status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(orderflow_api_http_request_duration_seconds_count{namespace={{ .Release.Namespace | quote }}}[5m])), 0.001)
+            > 0.05
+          for: 10m
+          labels: { severity: warning, service: orderflow-api }
+          annotations:
+            summary: OrderFlow API 5xx rate is above 5 percent
+            runbook_url: https://github.com/Oheneali22/orderflow/blob/main/docs/runbooks/api-high-error-rate.md
+        - alert: OrderFlowApiHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(orderflow_api_http_request_duration_seconds_bucket{namespace={{ .Release.Namespace | quote }}}[5m]))
+            ) > 0.5
+          for: 10m
+          labels: { severity: warning, service: orderflow-api }
+          annotations:
+            summary: OrderFlow API p95 latency is above 500 milliseconds
+            runbook_url: https://github.com/Oheneali22/orderflow/blob/main/docs/runbooks/api-high-latency.md
+{{- end }}

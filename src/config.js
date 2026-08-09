@@ -15,6 +15,7 @@ export function loadConfig() {
     apiPort: numberFromEnvironment("API_PORT", 3000),
     workerHealthPort: numberFromEnvironment("WORKER_HEALTH_PORT", 3001),
     workerPollIntervalMs: numberFromEnvironment("WORKER_POLL_INTERVAL_MS", 1000),
-    workerProcessingDelayMs: numberFromEnvironment("WORKER_PROCESSING_DELAY_MS", 1500)
+    workerProcessingDelayMs: numberFromEnvironment("WORKER_PROCESSING_DELAY_MS", 1500),
+    workerClaimTimeoutMs: numberFromEnvironment("WORKER_CLAIM_TIMEOUT_MS", 60000)
   };
 }

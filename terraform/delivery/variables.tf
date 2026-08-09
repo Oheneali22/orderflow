@@ -15,3 +15,20 @@ variable "github_repository" {
   type        = string
   default     = "Oheneali22/orderflow"
 }
+
+variable "github_oidc_subject_prefix" {
+  description = "Immutable GitHub OIDC subject prefix, including owner and repository IDs."
+  type        = string
+  default     = "repo:Oheneali22@279475744/orderflow@1327790997"
+
+  validation {
+    condition     = startswith(var.github_oidc_subject_prefix, "repo:${var.github_repository_owner}@")
+    error_message = "The OIDC subject prefix must use the configured GitHub repository owner."
+  }
+}
+
+variable "github_repository_owner" {
+  description = "GitHub repository owner used to validate the immutable OIDC subject."
+  type        = string
+  default     = "Oheneali22"
+}
