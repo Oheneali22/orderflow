@@ -1,0 +1,22 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- $root := . -}}
+{{- range $name := list "api" "worker" }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $root.Release.Name }}-{{ $name }}
+  labels:
+    {{- include "orderflow.labels" $root | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      {{- include "orderflow.selectorLabels" $root | nindent 6 }}
+      app.kubernetes.io/component: {{ $name }}
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ $root.Values.serviceMonitor.interval }}
+---
+{{- end }}
+{{- end }}

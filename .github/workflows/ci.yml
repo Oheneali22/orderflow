@@ -57,7 +57,7 @@ jobs:
     runs-on: ubuntu-24.04
     strategy:
       matrix:
-        directory: [terraform/state-bootstrap, terraform/delivery]
+        directory: [terraform/state-bootstrap, terraform/delivery, terraform/platform]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,6 +77,32 @@ jobs:
       - name: Validate configuration
         working-directory: ${{ matrix.directory }}
         run: terraform validate
+
+  helm-validate:
+    name: Helm validate
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v3.21.2
+
+      - name: Lint production chart
+        run: helm lint charts/orderflow --values environments/production/values.yaml
+
+      - name: Render production manifests
+        run: helm template orderflow charts/orderflow --values environments/production/values.yaml > /tmp/orderflow-production.yaml
+
+      - name: Lint disposable development chart
+        run: >-
+          helm lint charts/orderflow
+          --set global.imageTag=sha-test
+          --set developmentPostgresql.enabled=true
+          --set web.autoscaling.enabled=false
+          --set api.autoscaling.enabled=false
 
   image:
     name: Build and scan ${{ matrix.name }}
