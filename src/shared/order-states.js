@@ -1,0 +1,6 @@
+export const ORDER_STATES = Object.freeze({
+  PENDING: "PENDING",
+  PROCESSING: "PROCESSING",
+  COMPLETED: "COMPLETED",
+  FAILED: "FAILED"
+});

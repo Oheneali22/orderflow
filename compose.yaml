@@ -1,41 +1,56 @@
-name: support-ticket-platform
+name: orderflow
 
 services:
   database:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: support
-      POSTGRES_USER: support
+      POSTGRES_DB: orderflow
+      POSTGRES_USER: orderflow
       POSTGRES_PASSWORD: local-development-only
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - orderflow-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U support -d support"]
+      test: ["CMD-SHELL", "pg_isready -U orderflow -d orderflow"]
       interval: 5s
       timeout: 3s
       retries: 10
-    networks: [backend]
+    networks: [data]
 
-  backend:
+  api:
     build:
-      context: ./backend
+      context: .
+      dockerfile: Dockerfile.api
     environment:
-      DATABASE_URL: postgresql://support:local-development-only@database:5432/support
-      LOG_LEVEL: INFO
-      APP_ENV: local
+      DATABASE_URL: postgresql://orderflow:local-development-only@database:5432/orderflow
+      LOG_LEVEL: info
+      API_PORT: 3000
     depends_on:
       database:
         condition: service_healthy
-    ports:
-      - "5000:5000"
-    networks: [backend, edge]
+    networks: [edge, data]
     restart: unless-stopped
 
-  frontend:
+  worker:
     build:
-      context: ./frontend
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql://orderflow:local-development-only@database:5432/orderflow
+      LOG_LEVEL: info
+      WORKER_HEALTH_PORT: 3001
+      WORKER_POLL_INTERVAL_MS: 1000
+      WORKER_PROCESSING_DELAY_MS: 1500
     depends_on:
-      backend:
+      database:
+        condition: service_healthy
+    networks: [data]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+    depends_on:
+      api:
         condition: service_healthy
     ports:
       - "8080:8080"
@@ -44,8 +59,8 @@ services:
 
 networks:
   edge:
-  backend:
+  data:
     internal: true
 
 volumes:
-  postgres-data:
+  orderflow-data:
