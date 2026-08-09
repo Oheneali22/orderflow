@@ -50,3 +50,9 @@ Open `http://localhost:8080`. Only the web service is published to the host. The
 This milestone does not include EKS, Kubernetes, SQS, SNS, RDS, Helm, Argo CD, or production secrets. Those components will be added only when the current deployment and failure modes are understood. Local credentials in Compose are disposable and are not a production secret-management pattern.
 
 See [architecture.md](docs/architecture.md) and [troubleshooting.md](docs/troubleshooting.md).
+
+## Delivery pipeline
+
+Pull requests run linting, unit tests, a real PostgreSQL integration test, Terraform validation, three image builds, and blocking Trivy scans. A push to `main` performs the same checks, assumes a least-privilege AWS role through GitHub OIDC, and publishes the exact scanned images to private ECR repositories with immutable `sha-<commit>` tags.
+
+No long-lived AWS access keys are stored in GitHub. Terraform manages the ECR repositories and publisher role in [`terraform/delivery`](terraform/delivery); its state is stored in the protected OrderFlow S3 backend created by [`terraform/state-bootstrap`](terraform/state-bootstrap).

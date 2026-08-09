@@ -1,6 +1,7 @@
 FROM nginx:1.29-alpine
 
-RUN rm /etc/nginx/conf.d/default.conf \
+RUN apk upgrade --no-cache \
+    && rm /etc/nginx/conf.d/default.conf \
     && chown -R nginx:nginx /var/cache/nginx /etc/nginx/conf.d \
     && touch /run/nginx.pid \
     && chown nginx:nginx /run/nginx.pid
