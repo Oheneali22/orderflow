@@ -20,7 +20,7 @@ Secrets move from Secrets Manager through a controller with a single-secret Pod 
 
 ## Honest boundaries
 
-- The Kubernetes runtime was verified in a disposable local cluster; the AWS application stack is cost-gated rather than claimed as continuously hosted.
+- The Kubernetes runtime was verified both in a disposable local cluster and in a time-bounded AWS deployment. In AWS, Argo CD reconciled the full platform, EBS CSI provisioned Prometheus/Grafana volumes, and a live order traversed web, API, private RDS, and worker from `PENDING` to `COMPLETED`; paid resources were then torn down.
 - PostgreSQL is the current queue. Explain the transactional-outbox-to-SQS migration instead of calling the database SQS.
 - The sample lacks end-user authentication, WAF, TLS/DNS configuration, and payment handling.
 - SLOs are proposed targets until real production traffic supplies a measurement window.
