@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrderFlow</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <div><span class="mark">OF</span><strong>OrderFlow</strong></div>
+    <span id="api-status" class="status">Checking system…</span>
+  </header>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">DEVOPS LAB · ASYNC ORDER PROCESSING</p>
+      <h1>Place an order.<br><em>Watch it flow.</em></h1>
+      <p>Choose products, submit an order, and observe the API and worker move it through the processing lifecycle.</p>
+    </section>
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-heading"><h2>Products</h2><span>Quantity</span></div>
+        <form id="order-form">
+          <div id="products" class="products"><p>Loading products…</p></div>
+          <button type="submit">Create order</button>
+          <p id="form-message" role="status"></p>
+        </form>
+      </article>
+      <article class="panel tracker">
+        <h2>Order status</h2>
+        <label for="order-id">Order ID</label>
+        <div class="search"><input id="order-id" placeholder="Paste an order ID"><button id="track" type="button">Track</button></div>
+        <div id="order" class="order-empty">Create or search for an order to see its state.</div>
+      </article>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
