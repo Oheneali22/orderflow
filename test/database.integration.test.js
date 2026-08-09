@@ -28,3 +28,26 @@ test("PostgreSQL stores and processes an order transactionally", { skip: !databa
     await pool.end();
   }
 });
+
+test("PostgreSQL reclaims a job after its worker lease expires", { skip: !databaseUrl }, async () => {
+  const pool = createPool(databaseUrl);
+  await migrate(pool);
+  const repository = createOrderRepository(pool, { claimTimeoutMs: 1000 });
+  let order;
+  try {
+    order = await repository.createOrder([{ productId: "mouse", quantity: 1 }]);
+    const firstClaim = await repository.claimNextJob();
+    assert.equal(firstClaim.orderId, order.id);
+
+    await pool.query(
+      "UPDATE order_jobs SET claimed_at = NOW() - INTERVAL '2 seconds' WHERE id = $1",
+      [firstClaim.id]
+    );
+    const reclaimed = await repository.claimNextJob();
+    assert.deepEqual(reclaimed, firstClaim);
+    await repository.completeJob(reclaimed);
+  } finally {
+    if (order) await pool.query("DELETE FROM orders WHERE id = $1", [order.id]);
+    await pool.end();
+  }
+});

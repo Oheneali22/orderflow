@@ -42,6 +42,11 @@ variable "cluster_public_access_cidrs" {
     error_message = "Provide at least one explicit administrative CIDR; 0.0.0.0/0 is prohibited."
   }
 }
+variable "cluster_endpoint_public_access" {
+  type        = bool
+  default     = false
+  description = "Expose the EKS API through its public endpoint. Keep false in production; enable only for a time-bounded demonstration with explicit CIDRs."
+}
 variable "enable_nat_gateway" {
   type        = bool
   default     = false

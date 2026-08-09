@@ -19,7 +19,7 @@ const processed = new client.Counter({
   help: "Number of jobs claimed by the worker.",
   registers: [registry]
 });
-const repository = createOrderRepository(pool);
+const repository = createOrderRepository(pool, { claimTimeoutMs: config.workerClaimTimeoutMs });
 const processOne = createProcessor({
   repository,
   logger,
@@ -27,20 +27,27 @@ const processOne = createProcessor({
 });
 let databaseReady = true;
 let processing = false;
+let shuttingDown = false;
+let currentCycle = Promise.resolve();
 
-const timer = setInterval(async () => {
-  if (processing) return;
+async function poll() {
+  if (processing || shuttingDown) return;
   processing = true;
-  try {
-    databaseReady = true;
-    if (await processOne()) processed.inc();
-  } catch (error) {
-    databaseReady = false;
-    logger.error({ err: error }, "worker_poll_failed");
-  } finally {
-    processing = false;
-  }
-}, config.workerPollIntervalMs);
+  currentCycle = (async () => {
+    try {
+      databaseReady = true;
+      if (await processOne()) processed.inc();
+    } catch (error) {
+      databaseReady = false;
+      logger.error({ err: error }, "worker_poll_failed");
+    } finally {
+      processing = false;
+    }
+  })();
+  await currentCycle;
+}
+
+const timer = setInterval(() => void poll(), config.workerPollIntervalMs);
 
 const healthApp = express();
 healthApp.disable("x-powered-by");
@@ -56,13 +63,15 @@ const healthServer = healthApp.listen(config.workerHealthPort, "0.0.0.0", () => 
 });
 
 async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   logger.info({ signal }, "worker_stopping");
   clearInterval(timer);
-  healthServer.close(async () => {
-    await pool.end();
-    process.exit(0);
-  });
+  await currentCycle;
+  await new Promise((resolve, reject) => healthServer.close((error) => error ? reject(error) : resolve()));
+  await pool.end();
+  process.exit(0);
 }
 
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));

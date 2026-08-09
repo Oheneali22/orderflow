@@ -12,16 +12,31 @@ resource "aws_cloudwatch_log_group" "cluster" {
   retention_in_days = 30
 }
 
+resource "aws_kms_key" "eks_secrets" {
+  description             = "Envelope encryption for ${local.name} Kubernetes secrets"
+  enable_key_rotation     = true
+  deletion_window_in_days = 30
+}
+
+resource "aws_kms_alias" "eks_secrets" {
+  name          = "alias/${local.name}-eks-secrets"
+  target_key_id = aws_kms_key.eks_secrets.key_id
+}
+
 resource "aws_eks_cluster" "this" {
   name                      = local.name
   role_arn                  = aws_iam_role.cluster.arn
   version                   = var.kubernetes_version
   enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
   access_config { authentication_mode = "API" }
+  encryption_config {
+    provider { key_arn = aws_kms_key.eks_secrets.arn }
+    resources = ["secrets"]
+  }
   vpc_config {
     subnet_ids              = concat(aws_subnet.public[*].id, aws_subnet.private[*].id)
     endpoint_private_access = true
-    endpoint_public_access  = true
+    endpoint_public_access  = var.cluster_endpoint_public_access
     public_access_cidrs     = var.cluster_public_access_cidrs
   }
   depends_on = [aws_iam_role_policy_attachment.cluster, aws_cloudwatch_log_group.cluster]

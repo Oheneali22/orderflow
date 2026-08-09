@@ -94,6 +94,7 @@ data "aws_iam_policy_document" "ecr_publish" {
     effect = "Allow"
     actions = [
       "ecr:BatchCheckLayerAvailability",
+      "ecr:DescribeImages",
       "ecr:CompleteLayerUpload",
       "ecr:InitiateLayerUpload",
       "ecr:PutImage",

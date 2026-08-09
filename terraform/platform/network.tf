@@ -83,16 +83,19 @@ resource "aws_security_group" "endpoints" {
     protocol    = "tcp"
     cidr_blocks = [var.vpc_cidr]
   }
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 }
 
 locals {
-  interface_endpoints = toset(["ecr.api", "ecr.dkr", "ec2", "eks", "logs", "sts"])
+  interface_endpoints = toset([
+    "ec2",
+    "ecr.api",
+    "ecr.dkr",
+    "eks",
+    "eks-auth",
+    "logs",
+    "secretsmanager",
+    "sts"
+  ])
 }
 resource "aws_vpc_endpoint" "interface" {
   for_each            = local.interface_endpoints

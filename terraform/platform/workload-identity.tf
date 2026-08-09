@@ -13,8 +13,11 @@ resource "aws_iam_role" "external_secrets" {
 }
 data "aws_iam_policy_document" "external_secrets" {
   statement {
-    actions   = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
-    resources = [aws_secretsmanager_secret.database.arn]
+    actions = ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]
+    resources = [
+      aws_secretsmanager_secret.database.arn,
+      aws_secretsmanager_secret.grafana_admin.arn
+    ]
   }
 }
 resource "aws_iam_role_policy" "external_secrets" {

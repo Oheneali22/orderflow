@@ -10,3 +10,4 @@ data:
   WORKER_HEALTH_PORT: {{ .Values.worker.service.port | quote }}
   WORKER_POLL_INTERVAL_MS: {{ .Values.config.workerPollIntervalMs | quote }}
   WORKER_PROCESSING_DELAY_MS: {{ .Values.config.workerProcessingDelayMs | quote }}
+  WORKER_CLAIM_TIMEOUT_MS: {{ .Values.config.workerClaimTimeoutMs | quote }}

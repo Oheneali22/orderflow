@@ -52,3 +52,22 @@ resource "aws_secretsmanager_secret_version" "database" {
     DATABASE_URL = "postgresql://${aws_db_instance.this.username}:${urlencode(random_password.database.result)}@${aws_db_instance.this.address}:${aws_db_instance.this.port}/${aws_db_instance.this.db_name}?sslmode=require"
   })
 }
+
+resource "random_password" "grafana_admin" {
+  length           = 32
+  special          = true
+  override_special = "!#$%&*+-.:=?@^_"
+}
+
+resource "aws_secretsmanager_secret" "grafana_admin" {
+  name                    = "${local.name}/grafana-admin"
+  recovery_window_in_days = 7
+}
+
+resource "aws_secretsmanager_secret_version" "grafana_admin" {
+  secret_id = aws_secretsmanager_secret.grafana_admin.id
+  secret_string = jsonencode({
+    admin-user     = "admin"
+    admin-password = random_password.grafana_admin.result
+  })
+}

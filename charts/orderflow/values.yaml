@@ -5,6 +5,7 @@ global:
 
 web:
   replicaCount: 2
+  runAsUser: 101
   image:
     repository: orderflow-web
     digest: ""
@@ -22,6 +23,7 @@ web:
 
 api:
   replicaCount: 2
+  runAsUser: 1000
   image:
     repository: orderflow-api
     digest: ""
@@ -39,6 +41,7 @@ api:
 
 worker:
   replicaCount: 2
+  runAsUser: 1000
   image:
     repository: orderflow-worker
     digest: ""
@@ -62,6 +65,7 @@ config:
   logLevel: info
   workerPollIntervalMs: 1000
   workerProcessingDelayMs: 1500
+  workerClaimTimeoutMs: 60000
 
 ingress:
   enabled: false
@@ -80,6 +84,12 @@ podDisruptionBudget:
 serviceMonitor:
   enabled: false
   interval: 30s
+
+prometheusRule:
+  enabled: false
+
+grafanaDashboard:
+  enabled: false
 
 developmentPostgresql:
   enabled: false

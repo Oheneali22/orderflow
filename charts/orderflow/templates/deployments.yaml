@@ -40,9 +40,15 @@ spec:
           image: {{ include "orderflow.image" (list $root $values.image) }}
           imagePullPolicy: {{ $values.image.pullPolicy }}
           securityContext:
+            runAsUser: {{ $values.runAsUser }}
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
+          {{- if eq $name "web" }}
+          volumeMounts:
+            - { name: nginx-cache, mountPath: /var/cache/nginx }
+            - { name: nginx-run, mountPath: /run }
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ $values.service.port }}
@@ -65,5 +71,10 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 15
           resources: {{ toYaml $values.resources | nindent 12 }}
+      {{- if eq $name "web" }}
+      volumes:
+        - { name: nginx-cache, emptyDir: {} }
+        - { name: nginx-run, emptyDir: {} }
+      {{- end }}
 ---
 {{- end }}
