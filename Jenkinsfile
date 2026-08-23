@@ -25,5 +25,10 @@ pipeline {
                 sh 'npm run lint'
             }
         }
+        stage('Unit tests') {
+            steps {
+                sh 'node --test --test-concurrency=1 test/api.test.js test/processor.test.js'
+            }
+        }
     }
 }
