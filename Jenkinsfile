@@ -85,6 +85,29 @@ pipeline {
                 sh 'node --test --test-concurrency=1 test/database.integration.test.js'
             }
         }
+
+        stage('Build images') {
+            steps {
+                sh '''
+                    IMAGE_TAG="sha-$(git rev-parse HEAD)"
+
+                    docker build \
+                        --file web/Dockerfile \
+                        --tag "orderflow-web:$IMAGE_TAG" \
+                        web
+
+                    docker build \
+                        --file Dockerfile.api \
+                        --tag "orderflow-api:$IMAGE_TAG" \
+                        .
+
+                    docker build \
+                        --file Dockerfile.worker \
+                        --tag "orderflow-worker:$IMAGE_TAG" \
+                        .
+                '''
+            }
+        }
     }
 
     post {
