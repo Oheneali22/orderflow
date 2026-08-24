@@ -108,6 +108,31 @@ pipeline {
                 '''
             }
         }
+
+        stage('Scan images') {
+            steps {
+                sh '''
+                    IMAGE_TAG="sha-$(git rev-parse HEAD)"
+                    scan_failed=0
+
+                    for component in web api worker; do
+                        image="orderflow-$component:$IMAGE_TAG"
+
+                        docker run --rm \
+                            --volume /var/run/docker.sock:/var/run/docker.sock \
+                            --volume orderflow-trivy-cache:/root/.cache/trivy \
+                            aquasec/trivy:0.73.0 image \
+                            --scanners vuln \
+                            --severity HIGH,CRITICAL \
+                            --ignore-unfixed \
+                            --exit-code 1 \
+                            "$image" || scan_failed=1
+                    done
+
+                    exit "$scan_failed"
+                '''
+            }
+        }
     }
 
     post {
