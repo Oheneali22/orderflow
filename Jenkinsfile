@@ -96,16 +96,22 @@ pipeline {
                     IMAGE_TAG="sha-$(git rev-parse HEAD)"
 
                     docker build \
+                        --pull \
+                        --no-cache \
                         --file web/Dockerfile \
                         --tag "orderflow-web:$IMAGE_TAG" \
                         web
 
                     docker build \
+                        --pull \
+                        --no-cache \
                         --file Dockerfile.api \
                         --tag "orderflow-api:$IMAGE_TAG" \
                         .
 
                     docker build \
+                        --pull \
+                        --no-cache \
                         --file Dockerfile.worker \
                         --tag "orderflow-worker:$IMAGE_TAG" \
                         .
