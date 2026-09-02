@@ -147,7 +147,7 @@ pipeline {
         stage('Publish images to ECR') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'orderflow-ecr-publisher',
+                    credentialsId: 'f7f00263-cd95-4b14-a88f-9bf2220b4b3d',
                     usernameVariable: 'AWS_ACCESS_KEY_ID',
                     passwordVariable: 'AWS_SECRET_ACCESS_KEY'
                 )]) {
