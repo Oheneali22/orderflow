@@ -4,6 +4,10 @@ pipeline {
     environment {
         TEST_DATABASE_CONTAINER = 'orderflow-jenkins-test-postgres'
         TEST_DATABASE_URL = 'postgresql://orderflow:test-only@orderflow-jenkins-test-postgres:5432/orderflow_test'
+        AWS_ACCOUNT_ID = '942909611186'
+        AWS_REGION = 'us-east-1'
+        ECR_REGISTRY = '942909611186.dkr.ecr.us-east-1.amazonaws.com'
+        ECR_PUBLISH_ROLE_ARN = 'arn:aws:iam::942909611186:role/OrderFlowJenkinsECRPublisherRole'
     }
 
     stages {
@@ -133,11 +137,88 @@ pipeline {
                 '''
             }
         }
+
+        stage('Publish images to ECR') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'orderflow-ecr-publisher',
+                    usernameVariable: 'AWS_ACCESS_KEY_ID',
+                    passwordVariable: 'AWS_SECRET_ACCESS_KEY'
+                )]) {
+                    sh '''
+                        set +x
+                        IMAGE_TAG="sha-$(git rev-parse HEAD)"
+
+                        ROLE_CREDENTIALS=$(docker run --rm \
+                            --env AWS_ACCESS_KEY_ID \
+                            --env AWS_SECRET_ACCESS_KEY \
+                            --env AWS_DEFAULT_REGION="$AWS_REGION" \
+                            amazon/aws-cli:2.36.32 \
+                            sts assume-role \
+                            --role-arn "$ECR_PUBLISH_ROLE_ARN" \
+                            --role-session-name "orderflow-jenkins-${BUILD_NUMBER}" \
+                            --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' \
+                            --output text)
+
+                        set -- $ROLE_CREDENTIALS
+                        if [ "$#" -ne 3 ]; then
+                            echo "Jenkins did not receive three temporary role credentials"
+                            exit 1
+                        fi
+
+                        export AWS_ACCESS_KEY_ID="$1"
+                        export AWS_SECRET_ACCESS_KEY="$2"
+                        export AWS_SESSION_TOKEN="$3"
+
+                        docker run --rm \
+                            --env AWS_ACCESS_KEY_ID \
+                            --env AWS_SECRET_ACCESS_KEY \
+                            --env AWS_SESSION_TOKEN \
+                            --env AWS_DEFAULT_REGION="$AWS_REGION" \
+                            amazon/aws-cli:2.36.32 \
+                            ecr get-login-password --region "$AWS_REGION" | \
+                            docker login \
+                                --username AWS \
+                                --password-stdin \
+                                "$ECR_REGISTRY"
+
+                        for component in web api worker; do
+                            local_image="orderflow-$component:$IMAGE_TAG"
+                            remote_image="$ECR_REGISTRY/orderflow-$component:$IMAGE_TAG"
+
+                            docker tag "$local_image" "$remote_image"
+                            docker push "$remote_image"
+                        done
+
+                        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN ROLE_CREDENTIALS
+                    '''
+                }
+            }
+        }
+
+        stage('Clean published images') {
+            steps {
+                sh '''
+                    IMAGE_TAG="sha-$(git rev-parse HEAD)"
+
+                    for component in web api worker; do
+                        docker image rm \
+                            "$ECR_REGISTRY/orderflow-$component:$IMAGE_TAG" \
+                            "orderflow-$component:$IMAGE_TAG" || true
+                    done
+
+                    docker logout "$ECR_REGISTRY" || true
+                '''
+            }
+        }
     }
 
     post {
         always {
-            sh 'docker rm --force "$TEST_DATABASE_CONTAINER" 2>/dev/null || true'
+            sh '''
+                docker rm --force "$TEST_DATABASE_CONTAINER" 2>/dev/null || true
+                docker logout "$ECR_REGISTRY" 2>/dev/null || true
+            '''
         }
     }
 }
