@@ -63,6 +63,7 @@ secrets:
   rdsSecretArn: "arn:aws:secretsmanager:us-east-1:942909611186:secret:rds!db-c8aa699a-062d-45f6-8248-1bc6a468d361-9btevP"
 
 migration:
+  enabled: false
   backoffLimit: 2
 
 ingress:

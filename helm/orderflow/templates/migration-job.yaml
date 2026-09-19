@@ -1,12 +1,15 @@
+{{- if .Values.migration.enabled }}
+
 apiVersion: batch/v1
 kind: Job
 
 metadata:
-  name: orderflow-db-migration
+  name: orderflow-db-migration-{{ .Values.api.image.tag | trunc 12 }}
   namespace: {{ .Release.Namespace }}
 
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
+  ttlSecondsAfterFinished: 600
 
   template:
     metadata:
@@ -61,3 +64,5 @@ spec:
         - name: rds-ca
           configMap:
             name: orderflow-rds-ca
+
+{{- end }}

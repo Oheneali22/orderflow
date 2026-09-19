@@ -130,3 +130,100 @@ jobs:
             .
 
           docker push $REGISTRY/orderflow-worker:$IMAGE_TAG
+    
+    deploy:
+    name: Deploy to EKS
+    needs: build-and-push
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: us-east-1
+      EKS_CLUSTER: orderflow-dev
+      NAMESPACE: orderflow
+      RELEASE_NAME: orderflow
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::942909611186:role/GitHubActionsOrderFlowRole
+          aws-region: us-east-1
+
+      - name: Configure Kubernetes access
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER"
+
+      - name: Verify Kubernetes authorization
+        run: |
+          kubectl auth can-i get deployments -n "$NAMESPACE"
+          kubectl auth can-i create jobs.batch -n "$NAMESPACE"
+
+      - name: Apply deployer RBAC
+        run: |
+          kubectl apply -f k8s/github-actions-rbac.yaml
+
+      - name: Run database migration
+        run: |
+          SHORT_SHA="${GITHUB_SHA::12}"
+          MIGRATION_JOB="orderflow-db-migration-${SHORT_SHA}"
+
+          echo "Migration job: $MIGRATION_JOB"
+
+          kubectl delete job "$MIGRATION_JOB" \
+            -n "$NAMESPACE" \
+            --ignore-not-found=true
+
+          helm template "$RELEASE_NAME" helm/orderflow \
+            --namespace "$NAMESPACE" \
+            --set migration.enabled=true \
+            --set api.image.tag="$GITHUB_SHA" \
+            --set worker.image.tag="$GITHUB_SHA" \
+            --show-only templates/migration-job.yaml \
+            | kubectl apply -f -
+
+          if ! kubectl wait \
+            --for=condition=complete \
+            "job/$MIGRATION_JOB" \
+            -n "$NAMESPACE" \
+            --timeout=5m; then
+
+            kubectl describe job "$MIGRATION_JOB" -n "$NAMESPACE"
+            kubectl logs "job/$MIGRATION_JOB" -n "$NAMESPACE" || true
+            exit 1
+          fi
+
+      - name: Deploy application with Helm
+        run: |
+          helm upgrade --install "$RELEASE_NAME" helm/orderflow \
+            --namespace "$NAMESPACE" \
+            --set migration.enabled=false \
+            --set api.image.tag="$GITHUB_SHA" \
+            --set worker.image.tag="$GITHUB_SHA" \
+            --atomic \
+            --wait \
+            --timeout 10m
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/orderflow-api \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+          kubectl rollout status deployment/orderflow-worker \
+            -n "$NAMESPACE" \
+            --timeout=5m
+
+          kubectl get pods -n "$NAMESPACE"
