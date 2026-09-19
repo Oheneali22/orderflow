@@ -131,7 +131,7 @@ jobs:
 
           docker push $REGISTRY/orderflow-worker:$IMAGE_TAG
     
-    deploy:
+  deploy:
     name: Deploy to EKS
     needs: build-and-push
 
