@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderflow-worker
+  namespace: orderflow
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: orderflow-worker
+
+  template:
+    metadata:
+      labels:
+        app: orderflow-worker
+
+    spec:
+      serviceAccountName: orderflow
+
+      containers:
+        - name: worker
+          image: 942909611186.dkr.ecr.us-east-1.amazonaws.com/orderflow-worker:a38911a
+
+          envFrom:
+            - configMapRef:
+                name: orderflow-config
+
+          env:
+            - name: DB_USERNAME_FILE
+              value: /mnt/secrets/db-username
+
+            - name: DB_PASSWORD_FILE
+              value: /mnt/secrets/db-password
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/us-east-1-bundle.pem
+
+          ports:
+            - name: health
+              containerPort: 3001
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: health
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: health
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+
+          volumeMounts:
+            - name: rds-secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+      volumes:
+        - name: rds-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: orderflow-rds
+
+        - name: rds-ca
+          configMap:
+            name: orderflow-rds-ca

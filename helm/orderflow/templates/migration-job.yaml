@@ -1,0 +1,63 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: orderflow-db-migration
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+
+  template:
+    metadata:
+      labels:
+        app: orderflow-db-migration
+
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      restartPolicy: Never
+
+      containers:
+        - name: migration
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+
+          command:
+            - npm
+            - run
+            - db:migrate
+
+          envFrom:
+            - configMapRef:
+                name: orderflow-config
+
+          env:
+            - name: DB_USERNAME_FILE
+              value: /mnt/secrets/db-username
+
+            - name: DB_PASSWORD_FILE
+              value: /mnt/secrets/db-password
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/us-east-1-bundle.pem
+
+          volumeMounts:
+            - name: rds-secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+      volumes:
+        - name: rds-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: orderflow-rds
+
+        - name: rds-ca
+          configMap:
+            name: orderflow-rds-ca

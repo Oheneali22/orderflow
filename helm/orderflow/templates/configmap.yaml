@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orderflow-config
+data:
+  DB_HOST: {{ .Values.database.host | quote }}
+  DB_PORT: {{ .Values.database.port | quote }}
+  DB_NAME: {{ .Values.database.name | quote }}
+
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  API_PORT: {{ .Values.config.apiPort | quote }}
+  WORKER_HEALTH_PORT: {{ .Values.config.workerHealthPort | quote }}
+  WORKER_POLL_INTERVAL_MS: {{ .Values.config.workerPollIntervalMs | quote }}
+  WORKER_PROCESSING_DELAY_MS: {{ .Values.config.workerProcessingDelayMs | quote }}
+  WORKER_CLAIM_TIMEOUT_MS: {{ .Values.config.workerClaimTimeoutMs | quote }}

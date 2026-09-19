@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orderflow-api
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  replicas: {{ .Values.api.replicaCount }}
+
+  selector:
+    matchLabels:
+      app: orderflow-api
+
+  template:
+    metadata:
+      labels:
+        app: orderflow-api
+
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.apiPort }}
+
+          envFrom:
+            - configMapRef:
+                name: orderflow-config
+
+          env:
+            - name: DB_USERNAME_FILE
+              value: /mnt/secrets/db-username
+
+            - name: DB_PASSWORD_FILE
+              value: /mnt/secrets/db-password
+
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/rds-ca/us-east-1-bundle.pem
+
+          volumeMounts:
+            - name: rds-secrets
+              mountPath: /mnt/secrets
+              readOnly: true
+
+            - name: rds-ca
+              mountPath: /etc/rds-ca
+              readOnly: true
+
+          readinessProbe:
+            httpGet:
+              path: /health/live
+              port: {{ .Values.config.apiPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: {{ .Values.config.apiPort }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: {{ .Values.api.resources.requests.cpu | quote }}
+              memory: {{ .Values.api.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.api.resources.limits.cpu | quote }}
+              memory: {{ .Values.api.resources.limits.memory | quote }}
+
+      volumes:
+        - name: rds-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: orderflow-rds
+
+        - name: rds-ca
+          configMap:
+            name: orderflow-rds-ca

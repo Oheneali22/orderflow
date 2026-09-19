@@ -1,9 +1,9 @@
-.git
-.github
 node_modules
-coverage
-terraform
-docs
-web
-*.md
+.git
+.gitignore
 .env
+.env.*
+npm-debug.log*
+tests
+k8s
+infrastructure

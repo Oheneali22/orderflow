@@ -1,0 +1,75 @@
+database:
+  host: orderflow-dev-postgres.c2jmoyokm51r.us-east-1.rds.amazonaws.com
+  port: "5432"
+  name: orderflow
+
+config:
+  logLevel: info
+  apiPort: "3000"
+  workerHealthPort: "3001"
+  workerPollIntervalMs: "1000"
+  workerProcessingDelayMs: "1500"
+  workerClaimTimeoutMs: "60000"
+
+
+api:
+  replicaCount: 2
+
+  image:
+    repository: 942909611186.dkr.ecr.us-east-1.amazonaws.com/orderflow-api
+    tag: a38911a
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+serviceAccount:
+  name: orderflow
+
+
+worker:
+  replicaCount: 1
+
+  image:
+    repository: 942909611186.dkr.ecr.us-east-1.amazonaws.com/orderflow-worker
+    tag: a38911a
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+serviceAccount:
+  create: true
+  name: orderflow
+
+aws:
+  region: us-east-1
+
+secrets:
+  rdsSecretArn: "arn:aws:secretsmanager:us-east-1:942909611186:secret:rds!db-c8aa699a-062d-45f6-8248-1bc6a468d361-9btevP"
+
+migration:
+  backoffLimit: 2
+
+ingress:
+  enabled: true
+  className: alb
+  scheme: internet-facing
+  targetType: ip
+  healthCheckPath: /health/ready
+  path: /
+  pathType: Prefix
