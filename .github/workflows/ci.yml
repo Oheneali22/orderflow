@@ -67,32 +67,12 @@ jobs:
       contents: read
       id-token: write
 
+    env:
+      AWS_REGION: us-east-1
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Temporary troubleshooting step.
-      # We print selected claims from the OIDC token,
-      # but NOT the token itself.
-      - name: Inspect GitHub OIDC claims
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com')
-
-            const payload = JSON.parse(
-              Buffer.from(token.split('.')[1], 'base64url').toString()
-            )
-
-            console.log(JSON.stringify({
-              aud: payload.aud,
-              sub: payload.sub,
-              repository: payload.repository,
-              repository_id: payload.repository_id,
-              repository_owner: payload.repository_owner,
-              repository_owner_id: payload.repository_owner_id,
-              ref: payload.ref
-            }, null, 2))
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -112,25 +92,57 @@ jobs:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build \
-            -f Dockerfile.api \
-            -t $REGISTRY/orderflow-api:$IMAGE_TAG \
-            .
+          set -euo pipefail
 
-          docker push $REGISTRY/orderflow-api:$IMAGE_TAG
+          EXISTING_TAG=$(aws ecr batch-get-image \
+            --repository-name orderflow-api \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region "$AWS_REGION" \
+            --query 'images[0].imageId.imageTag' \
+            --output text 2>/dev/null || true)
+
+          if [ "$EXISTING_TAG" = "$IMAGE_TAG" ]; then
+            echo "API image $IMAGE_TAG already exists."
+            echo "Reusing existing immutable image."
+          else
+            echo "API image does not exist. Building..."
+
+            docker build \
+              -f Dockerfile.api \
+              -t "$REGISTRY/orderflow-api:$IMAGE_TAG" \
+              .
+
+            docker push "$REGISTRY/orderflow-api:$IMAGE_TAG"
+          fi
 
       - name: Build and push Worker image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build \
-            -f Dockerfile.worker \
-            -t $REGISTRY/orderflow-worker:$IMAGE_TAG \
-            .
+          set -euo pipefail
 
-          docker push $REGISTRY/orderflow-worker:$IMAGE_TAG
-    
+          EXISTING_TAG=$(aws ecr batch-get-image \
+            --repository-name orderflow-worker \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region "$AWS_REGION" \
+            --query 'images[0].imageId.imageTag' \
+            --output text 2>/dev/null || true)
+
+          if [ "$EXISTING_TAG" = "$IMAGE_TAG" ]; then
+            echo "Worker image $IMAGE_TAG already exists."
+            echo "Reusing existing immutable image."
+          else
+            echo "Worker image does not exist. Building..."
+
+            docker build \
+              -f Dockerfile.worker \
+              -t "$REGISTRY/orderflow-worker:$IMAGE_TAG" \
+              .
+
+            docker push "$REGISTRY/orderflow-worker:$IMAGE_TAG"
+          fi
+
   deploy:
     name: Deploy to EKS
     needs: build-and-push
@@ -177,6 +189,8 @@ jobs:
 
       - name: Run database migration
         run: |
+          set -euo pipefail
+
           SHORT_SHA="${GITHUB_SHA::12}"
           MIGRATION_JOB="orderflow-db-migration-${SHORT_SHA}"
 
@@ -200,10 +214,19 @@ jobs:
             -n "$NAMESPACE" \
             --timeout=5m; then
 
-            kubectl describe job "$MIGRATION_JOB" -n "$NAMESPACE"
-            kubectl logs "job/$MIGRATION_JOB" -n "$NAMESPACE" || true
+            echo "Migration failed."
+
+            kubectl describe job "$MIGRATION_JOB" \
+              -n "$NAMESPACE"
+
+            kubectl logs \
+              "job/$MIGRATION_JOB" \
+              -n "$NAMESPACE" || true
+
             exit 1
           fi
+
+          echo "Database migration completed successfully."
 
       - name: Deploy application with Helm
         run: |
@@ -226,4 +249,14 @@ jobs:
             -n "$NAMESPACE" \
             --timeout=5m
 
+          echo "Running workloads:"
           kubectl get pods -n "$NAMESPACE"
+
+          echo "Deployed images:"
+          kubectl get deployment orderflow-api \
+            -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+
+          kubectl get deployment orderflow-worker \
+            -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
