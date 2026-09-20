@@ -183,10 +183,6 @@ jobs:
           kubectl auth can-i get deployments -n "$NAMESPACE"
           kubectl auth can-i create jobs.batch -n "$NAMESPACE"
 
-      - name: Apply deployer RBAC
-        run: |
-          kubectl apply -f k8s/github-actions-rbac.yaml
-
       - name: Run database migration
         run: |
           set -euo pipefail
@@ -252,11 +248,12 @@ jobs:
           echo "Running workloads:"
           kubectl get pods -n "$NAMESPACE"
 
-          echo "Deployed images:"
+          echo "Deployed API image:"
           kubectl get deployment orderflow-api \
             -n "$NAMESPACE" \
             -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
 
+          echo "Deployed Worker image:"
           kubectl get deployment orderflow-worker \
             -n "$NAMESPACE" \
             -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
